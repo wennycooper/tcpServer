@@ -1,4 +1,5 @@
 #include "ros/ros.h"
+#include <geometry_msgs/Twist.h>
 #include "std_msgs/String.h"
 #include <sstream>
 
@@ -9,9 +10,10 @@
 #include <string.h>
 #include <unistd.h>
 
-ros::Publisher chatter_pub;
+ros::Publisher pub;
 
 void doprocessing (int sock);
+void function1();
 
 int main(int argc, char *argv[])
 {
@@ -25,18 +27,8 @@ int main(int argc, char *argv[])
    ros::init(argc, argv, "tcpServer");
    ros::NodeHandle nh;
 
-   chatter_pub = nh.advertise<std_msgs::String>("chatter", 1000);
+   pub = nh.advertise<geometry_msgs::Twist>("turtle1/cmd_vel", 10);
 
-   sleep(10); // to let me have enough time to run "rostopic echo chatter"
-
-   std_msgs::String msg;
-   std::stringstream ss;
-   ss << "publish string on main()";
-   msg.data = ss.str();
-
-   chatter_pub.publish(msg);   // this works fine
-
-   
    /* First call to socket() function */
    sockfd = socket(AF_INET, SOCK_STREAM, 0);
    
@@ -69,35 +61,15 @@ int main(int argc, char *argv[])
    listen(sockfd,5);
    clilen = sizeof(cli_addr);
    
-   while (1)
-   {
-      newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-      if (newsockfd < 0)
-         {
-         perror("ERROR on accept");
-         exit(1);
-         }
+   newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+   if (newsockfd < 0) {
+      perror("ERROR on accept");
+      exit(1);
+   }
       
-      /* Create child process */
-      pid = fork();
-      if (pid < 0)
-         {
-         perror("ERROR on fork");
-         exit(1);
-         }
       
-      if (pid == 0)
-         {
-         /* This is the client process */
-         close(sockfd);
-         doprocessing(newsockfd);
-         exit(0);
-         }
-      else
-         {
-         close(newsockfd);
-         }
-   } /* end of while */
+   doprocessing(newsockfd);
+
 }
 
 
@@ -105,10 +77,15 @@ void doprocessing (int sock)
 {
    int n;
    char buffer[256];
-   
-   bzero(buffer,256);
+   bool dirty = false;
    
    int count = 0;
+   geometry_msgs::Twist twist;
+   double linear_ = 0.0;
+   double angular_ = 0.0;
+
+   ros::Rate loop_rate(10);
+
    while(ros::ok()) {
        bzero(buffer, 256);
        count ++;
@@ -118,25 +95,54 @@ void doprocessing (int sock)
          perror("ERROR reading from socket");
          exit(1);
        }
-   
-       buffer[n] = '\0';
-       printf("Here is the message: %s\n",buffer);
-//       n = write(sock,"I got your message",18);
 
-       std_msgs::String msg;
-       std::stringstream ss;
-       ss << buffer;
-       msg.data = ss.str();
+       dirty = false;
 
-       ROS_INFO("I heard: [%s]", msg.data.c_str());
+       if (n > 0) {
+           buffer[n] = '\0';
+           printf("Msg from socket buffer: %s (%d bytes)\n",buffer, n);
 
-       chatter_pub.publish(msg);   // this just NOT work... :~
+           if (!strncmp(buffer, "u", 1)) {
+               printf("matched u\n");
+               linear_ = 1.0;
+               angular_ = 0.0;
+               dirty = true;
+           }
+
+           if (!strncmp(buffer, "d", 1)) {
+               printf("matched d\n");
+               linear_ = -1.0;
+               angular_ = 0.0;
+               dirty = true;
+           }
+
+           if (!strncmp(buffer, "l", 1)) {
+               printf("matched l\n");
+               linear_ = 0.0;
+               angular_ = 1.0;
+               dirty = true;
+           }
+
+           if (!strncmp(buffer, "r", 1)) {
+               printf("matched r\n");
+               linear_ = 0.0;
+               angular_ = -1.0;
+               dirty = true;
+           }
+          
+
+
+           twist.linear.x = 1.0 * linear_;
+           twist.angular.z = 1.0 * angular_;
+           
+           if (dirty == true) {
+               pub.publish(twist);   
+               dirty = false;
+           }
+       }
 
        ros::spinOnce();
+       loop_rate.sleep();
    
-//       if (n < 0) {
-//         perror("ERROR writing to socket");
-//         exit(1);
-//       }
    }
 }
