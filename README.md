@@ -5,7 +5,7 @@
 * This program can be worked with another BluetoothChat project
 
 # Installation & Run
-* You must have a ROS package, for example "beginner_tutorial"
+* You must have a ROS package, for example "beginner_tutorials"
 * Put the source code under your [package_directory]/src
 * Modify the CMakeLists.txt
 
