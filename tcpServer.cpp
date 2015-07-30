@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
    ros::init(argc, argv, "tcpServer");
    ros::NodeHandle nh;
 
-   pub = nh.advertise<geometry_msgs::Twist>("turtle1/cmd_vel", 10);
+   pub = nh.advertise<geometry_msgs::Twist>("/example3_robot/cmd_vel", 10);
 
    /* First call to socket() function */
    sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -129,7 +129,13 @@ void doprocessing (int sock)
                angular_ = -1.0;
                dirty = true;
            }
-          
+
+           if (!strncmp(buffer, "s", 1)) {
+               printf("matched s\n");
+               angular_ = 0.0;
+               linear_ = 0.0;
+               dirty = true;
+           }
 
 
            twist.linear.x = 1.0 * linear_;
